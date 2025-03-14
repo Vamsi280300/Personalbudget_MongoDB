@@ -93,106 +93,101 @@
 
 <script>
     var dataSource = {
-        datasets: [
-            {
-                data: [],
-                backgroundColor: ['#ffcd56',
-                    '#ff6384',
-                    '#36a2eb',
-                    '#fd6b19',
-                    '#FF5733',
-                    '#28C13E',
-                    '#283EA6']
-            }
-        ],
+        datasets: [{
+            data: [],
+            backgroundColor: []
+        }],
         labels: []
     };
 
+    /**
+     * Create Chart.js Pie Chart
+     */
     function createChart() {
         var ctx = document.getElementById('myChart').getContext('2d');
-        var myPieChart = new Chart(ctx, {
+        new Chart(ctx, {
             type: 'pie',
             data: dataSource
         });
     }
 
+    /**
+     * Fetch Data for Chart.js and D3.js from MongoDB
+     */
     function getBudget() {
         axios.get('http://localhost:3000/budget')
             .then(function (res) {
-                const budgetData = res.data.myBudget;
+                const budgetData = res.data;
 
-                // Update Chart.js pie chart
+                // For Chart.js
                 budgetData.forEach((item, i) => {
                     dataSource.datasets[0].data[i] = item.budget;
+                    dataSource.datasets[0].backgroundColor[i] = item.color;
                     dataSource.labels[i] = item.title;
                 });
-                createChart();
+
+                createChart(); // Create Chart.js Pie Chart
+                renderD3DonutChart(budgetData); // Create D3.js Donut Chart
             })
             .catch(error => console.error("Error fetching budget data:", error));
     }
 
-    getBudget();
+    /**
+     * Render D3.js Donut Chart
+     */
+    function renderD3DonutChart(budgetData) {
+        const width = 600, height = 600, radius = Math.min(width, height) / 2;
 
-    function loadBudgetData() {
-        d3.json("/Readdata.json").then(function (data) {
-            console.log("Loaded budget data:", data);
-            renderD3DonutChart(data.myBudget);
-        }).catch(error => console.error("Error loading budget data:", error));
+        const svg = d3.select("#d3Graph")
+                      .attr("width", width)
+                      .attr("height", height)
+                      .append("g")
+                      .attr("transform", `translate(${width / 2}, ${height / 2})`);
+
+        const color = d3.scaleOrdinal()
+                        .domain(budgetData.map(d => d.title))
+                        .range(budgetData.map(d => d.color));
+
+        const pie = d3.pie().value(d => d.budget);
+        const data_ready = pie(budgetData);
+
+        const arc = d3.arc()
+                      .innerRadius(radius * 0.4)  // Creates the donut hole
+                      .outerRadius(radius * 0.9);
+
+        // Draw pie slices
+        svg.selectAll('slices')
+            .data(data_ready)
+            .enter().append('path')
+            .attr('d', arc)
+            .attr('fill', d => color(d.data.title))
+            .style("opacity", 0.8);
+
+        // Draw text labels outside the slices
+        svg.selectAll('labels')
+            .data(data_ready)
+            .enter().append('text')
+            .text(d => d.data.title)
+            .attr("transform", d => {
+                const pos = arc.centroid(d); // Get center of each slice
+                const xOffset = pos[0] * 1.5; 
+                const yOffset = pos[1] * 1.5;
+                return `translate(${xOffset},${yOffset})`;
+            })
+            .style("text-anchor", "middle")
+            .style("font-size", "12px")
+            .style("font-weight", "bold")
+            .style("fill", "black");
     }
 
-    function renderD3DonutChart(budgetData) {
-    const width = 600, height = 600, radius = Math.min(width, height) / 2;
-
-    const svg = d3.select("#d3Graph")
-                  .attr("width", width)
-                  .attr("height", height)
-                  .append("g")
-                  .attr("transform", `translate(${width / 2}, ${height / 2})`);
-
-    const color = d3.scaleOrdinal()
-                    .domain(budgetData.map(d => d.title))
-                    .range(['#ffcd56', '#ff6384', '#36a2eb', '#fd6b19', '#FF5733', '#28C13E', '#283EA6']);
-
-    const pie = d3.pie().value(d => d.budget);
-    const data_ready = pie(budgetData);
-
-    const arc = d3.arc()
-                  .innerRadius(radius * 0.4)  // Creates the donut hole
-                  .outerRadius(radius * 0.9);
-
-    // Draw pie slices
-    svg.selectAll('slices')
-        .data(data_ready)
-        .enter().append('path')
-        .attr('d', arc)
-        .attr('fill', d => color(d.data.title))
-        .style("opacity", 0.8);
-
-    // Draw text labels outside the slices
-    svg.selectAll('labels')
-        .data(data_ready)
-        .enter().append('text')
-        .text(d => d.data.title)
-        .attr("transform", d => {
-            const pos = arc.centroid(d); // Get center of each slice
-            const xOffset = pos[0] * 1.5; 
-            const yOffset = pos[1] * 1.5;
-            return `translate(${xOffset},${yOffset})`;
-        })
-        .style("text-anchor", "middle")
-        .style("font-size", "12px")
-        .style("font-weight", "bold")
-        .style("fill", "black");
-}
-
-
-
+    /**
+     * Load Data on DOM Content Loaded
+     */
     document.addEventListener("DOMContentLoaded", function () {
-        getBudget();       // Chart.js Pie Chart
-        loadBudgetData();  // D3.js Donut Chart
+        getBudget(); // Fetch and render data for both charts
     });
-    
 </script>
+
 
 </body>
 </html>

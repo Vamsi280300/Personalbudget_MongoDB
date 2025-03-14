@@ -1,31 +1,56 @@
-
-
 const express = require('express');
-const fs = require('fs');
-const path = require('path');
+const mongoose = require('mongoose');
+const cors = require('cors');
+const Budget = require('./models/Budget'); // Import the Budget model
 
 const app = express();
 const port = 3000;
-const cors = require('cors');
 
+// Middleware
 app.use(cors());
+app.use(express.json());
+app.use(express.static('public'));
 
-app.use(express.static('public')); 
+// MongoDB Connection
+mongoose.connect('mongodb://localhost:27017/personalBudget', {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+})
+.then(() => console.log('MongoDB Connected'))
+.catch(err => console.error('MongoDB Connection Error:', err));
 
+/**
+ * GET Endpoint to Fetch Budget Data
+ */
+app.get('/budget', async (req, res) => {
+    try {
+        const budgetData = await Budget.find();
+        res.json(budgetData);
+    } catch (err) {
+        res.status(500).json({ error: "Failed to fetch budget data" });
+    }
+});
 
-app.use('/Readdata.json', express.static(path.join(__dirname, 'Readdata.json')));
+/**
+ * POST Endpoint to Add Budget Data
+ */
+app.post('/budget', async (req, res) => {
+    try {
+        const { title, budget, color } = req.body;
 
-app.get('/budget', (req, res) => {
-    fs.readFile(path.join(__dirname, 'Readdata.json'), 'utf8', (err, data) => {
-        if (err) {
-            console.error("Error reading Readdata.json:", err);
-            return res.status(500).json({ error: "Failed to load budget data" });
-        }
-        res.json(JSON.parse(data));
-    });
+        const newBudget = new Budget({
+            title,
+            budget,
+            color
+        });
+
+        await newBudget.save();
+        res.status(201).json(newBudget);
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
 });
 
 app.listen(port, () => {
     console.log(`API served at http://localhost:${port}`);
 });
-
